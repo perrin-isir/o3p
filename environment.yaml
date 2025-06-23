@@ -1,0 +1,22 @@
+name:
+channels:
+- conda-forge
+dependencies:
+- python>=3.10,<=3.12
+- numpy>=2.0.0
+- pydantic>=2.11.3
+- omegaconf>=2.3.0
+- tqdm>=4.66.4
+- joblib>=1.4.2
+- scipy>=1.14.0
+- etils>=1.7.0
+- jax>=0.4.27
+- distrax>=0.1.5
+- optax>=0.2.3
+- dm-haiku>=0.0.12
+- pip:
+    - mujoco==3.1.6
+    - gymnasium>=1.1.1
+    - minari[hf]>=0.5.2
+    - gymnasium_robotics>=1.2.3
+#    - git+https://github.com/Farama-Foundation/Gymnasium-Robotics

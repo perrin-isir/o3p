@@ -1,0 +1,36 @@
+[build-system]
+requires = [
+    "setuptools",
+    "pathlib",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.versioningit.write]
+file = "VERSION"
+
+[project]
+name = "o3p"
+dynamic = ["version", "description"]
+readme = "README.md"
+requires-python = ">=3.10,<=12"
+dependencies = [
+    "numpy>=2.0.0",
+    "pydantic>=2.11.3",
+    "omegaconf>=2.3.0",
+    "tqdm>=4.66.4",
+    "joblib>=1.4.2",
+    "scipy>=1.14.0",
+    "etils>=1.7.0",
+    "jax>=0.4.27",
+    "distrax>=0.1.5",
+    "optax>=0.2.3",
+    "dm-haiku>=0.0.12",
+    "mujoco==3.1.6",
+    "gymnasium>=1.1.1",
+    "minari[hf]>=0.5.2",
+    "gymnasium_robotics>=1.2.3"
+]
+license = {file = "LICENSE"}
+
+[project.scripts]
+o3p = "o3p.__main__:main"

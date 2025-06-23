@@ -1,0 +1,3 @@
+include o3p/assets/*.svg
+include o3p/assets/*.png
+include o3p/VERSION
