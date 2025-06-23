@@ -26,6 +26,7 @@ but any python package manager can be used instead.
 
     pip install -e .
 
+</details>
 <details><summary> <b>How to use it</b> </summary><p>
 
 To test offline RL, run:
@@ -38,6 +39,9 @@ To test online RL, run:
 
     python test/online_rl.py
 
+</details>
 <details><summary> <b>Design choices</b> </summary><p>
 
 TODO
+
+</details>
