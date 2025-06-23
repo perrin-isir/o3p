@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://raw.githubusercontent.com/perrin-isir/o3p-private/main/o3p/assets/o3p_logo.png" alt="o3p logo"></img>
+<img src="https://raw.githubusercontent.com/perrin-isir/o3p/main/o3p/assets/o3p_logo.png" alt="o3p logo"></img>
 </div>
 
 [![codestyle](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -28,7 +28,15 @@ but any python package manager can be used instead.
 
 <details><summary> <b>How to use it</b> </summary><p>
 
+To test offline RL, run:
+
+    python test/offline_rl.py
+
 TODO
+
+To test online RL, run:
+
+    python test/online_rl.py
 
 <details><summary> <b>Design choices</b> </summary><p>
 
