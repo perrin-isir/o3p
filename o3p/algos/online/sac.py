@@ -8,7 +8,8 @@ import haiku as hk
 import gymnasium_robotics
 from gymnasium.wrappers import FlattenObservation
 from o3p.buffers import extract_from_batch
-from o3p.agents import AgentConfig, AgentTrainState, AgentNetworks, Agent
+from o3p.models import AgentConfig, AgentTrainState, AgentNetworks
+from o3p.agents import Agent
 from o3p.training import grad_update
 
 
@@ -22,6 +23,7 @@ class SAC(Agent):
         config_dict.distributional_actor = True
         config_dict.tanh_actor = True
         config_dict.num_critics = 2
+        config_dict.num_actors = 1
         config_dict.target_critic = True
         config_dict.target_value = False
         config_dict.target_actor = False
@@ -62,7 +64,7 @@ class SAC(Agent):
             log_alpha = scalars[0]
             alpha = jnp.exp(log_alpha)
 
-            next_dist, _ = networks.actor.apply(params_actor, next_observations)
+            next_dist, _ = networks.actor.apply(params_actor, next_observations, index=0)
             next_action, next_log_pi = next_dist.sample_and_log_prob(seed=key1)
 
             next_q_min = jnp.asarray(networks.critic.apply(
@@ -75,7 +77,7 @@ class SAC(Agent):
             q_list = networks.critic.apply(params_critic, observations, actions)
             loss_critic = sum((jnp.square(target_q - q)).mean() for q in q_list)
 
-            dist, _ = networks.actor.apply(params_actor, observations)
+            dist, _ = networks.actor.apply(params_actor, observations, index=0)
             action_actor, log_pi = dist.sample_and_log_prob(seed=key2)
 
             mean_q = (

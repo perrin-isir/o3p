@@ -4,11 +4,12 @@ from omegaconf import OmegaConf
 import numpy as np
 import jax.numpy as jnp
 from typing import Tuple, Dict, Any
-import haiku as hk
+import flax
 import gymnasium
 
 from o3p.buffers import extract_from_batch
-from o3p.agents import AgentConfig, AgentTrainState, Agent, AgentNetworks
+from o3p.models import AgentConfig, AgentTrainState, AgentNetworks
+from o3p.agents import Agent
 from o3p.training import grad_update
 
 
@@ -27,6 +28,7 @@ class IQL(Agent):
         config_dict.distributional_actor = True
         config_dict.tanh_actor = False
         config_dict.num_critics = 2
+        config_dict.num_actors = 1
         config_dict.target_critic = False
         config_dict.target_value = True
         config_dict.target_actor = False
@@ -65,19 +67,19 @@ class IQL(Agent):
         ))).min(axis=0)
 
         def _loss(
-            params_value: hk.Params,
-            params_critic: hk.Params,
-            params_actor: hk.Params,
+            params_value: flax.core.FrozenDict,
+            params_critic: flax.core.FrozenDict,
+            params_actor: flax.core.FrozenDict,
             scalars: jnp.ndarray,
         ) -> Tuple[jnp.ndarray, Dict]:
 
             q1, q2 = networks.critic.apply(params_critic, observations, actions)
             loss_critic = ((q1 - target_q) ** 2 + (q2 - target_q) ** 2).mean()
 
-            v = networks.value.apply(params_value, observations)[0]
+            v = networks.value.apply(params_value, observations, index=0)
             loss_value = expectile_loss(q - v, config.expectile).mean()
 
-            dist, predicted_actions = networks.actor.apply(params_actor, observations)
+            dist, predicted_actions = networks.actor.apply(params_actor, observations, index=0)
             log_probs = dist.log_prob(actions)
             # log_probs = dist.log_prob(actions.clip(-0.9999,0.9999))
             exp_a = jnp.exp((q - jax.lax.stop_gradient(v)) * config.beta)

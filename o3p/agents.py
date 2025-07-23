@@ -2,7 +2,6 @@ from typing import NamedTuple, Tuple, Dict, Any, List, Optional
 # import haiku as hk
 import flax
 import jax
-from pydantic import BaseModel
 import abc
 import numpy as np
 import jax.numpy as jnp
@@ -11,57 +10,13 @@ from gymnasium.spaces import Box as GymnaBox
 from gymnasium.spaces import Dict as GymnaDict
 import os
 import joblib
-import tempfile
 from omegaconf import OmegaConf
 
 from o3p.models import (
     ContinuousVFunction, ContinuousQFunction, 
-    StateDependentGaussianPolicyTanh, StateDependentGaussianPolicy, DeterministicPolicy
+    StateDependentGaussianPolicyTanh, StateDependentGaussianPolicy, DeterministicPolicy,
+    AgentConfig, AgentTrainState, AgentNetworks
 )
-
-
-class AgentConfig(BaseModel):
-    seed: int = 42
-    log_interval: Optional[int] = None
-    save_train_state_interval: Optional[int] = None
-    eval_interval: int = 100_000
-    eval_episodes: int = 8
-    batch_size: int = 256
-    buffer_size: int = int(1e6)
-    random_steps: int = 10_000
-    max_steps: int = int(1e6)
-    max_action: float = 1.
-    n_jitted_updates: int = 8
-    value_hidden_dims: Tuple[int, int] = (256, 256)
-    critic_hidden_dims: Tuple[int, int] = (256, 256)
-    actor_hidden_dims: Tuple[int, int] = (256, 256)
-    value_lr: float = 3e-4
-    critic_lr: float = 3e-4
-    scalars_lr: float = 3e-4
-    actor_lr: float = 3e-4
-    num_values: int = 1
-    num_critics: int = 1
-    num_scalars: int = 1
-    target_critic: bool = True
-    target_value: bool = True
-    target_actor: bool = False
-    tau: float = 1e-2
-    discount: float = 0.99
-    layer_norm: bool = True
-    opt_decay_schedule: bool = False
-    use_infos: bool = False
-    save_dir: str = os.path.join(tempfile.gettempdir(), "o3p", "logs")
-    distributional_actor: bool = True
-    tanh_actor: bool = True
-    policy_log_std_min: float = -10.0
-    policy_log_std_max: float = 2.0
-    policy_noise_std: float = 0.2
-    policy_noise_clip: float = 0.5
-    
-    def __hash__(
-        self,
-    ):  # make config hashable to be specified as static_argnums in jax.jit.
-        return hash(self.__repr__())
 
 
 def save_agent_config(agent_config: AgentConfig, save_dir: str):
@@ -71,31 +26,6 @@ def save_agent_config(agent_config: AgentConfig, save_dir: str):
     fout.write(OmegaConf.to_yaml(dict(agent_config)))
     fout.close()
     print(f"agent_config saved in {save_file}")
-
-
-class AgentTrainState(NamedTuple):
-    rng: jax.random.PRNGKey
-    params_critic: Any
-    params_critic_target: Any
-    opt_state_critic: Any
-    params_value: Any
-    params_value_target: Any
-    opt_state_value: Any
-    params_actor: Any
-    params_actor_target: Any
-    opt_state_actor: Any
-    scalars: Any
-    opt_state_scalars: Any
-
-
-class AgentNetworks(NamedTuple):
-    critic: Any
-    opt_critic: Any
-    value: Any
-    opt_value: Any
-    actor: Any
-    opt_actor: Any
-    opt_scalars: Any
 
 
 # def target_update(
@@ -348,29 +278,9 @@ class Agent(object):
             )
         return new_train_state, update_info
 
-    @classmethod
-    def get_distributional_action(
-        self,
-        train_state: AgentTrainState,
-        config: AgentConfig,
-        observations: np.ndarray,
-        seed: jax.random.PRNGKey,
-        networks: AgentNetworks,
-        deterministic: bool = False,
-        max_action: float = 1.0,  # Actions should be in [-1, 1] accross all dimensions
-    ) -> jnp.ndarray:
-        dist, deterministic_actions = networks.actor.apply(
-            train_state.params_actor, observations
-        )
-        rnd_actions = dist.sample(seed=seed)
-        rnd_actions = jnp.clip(rnd_actions, -max_action, max_action)
-        deterministic_actions = jnp.clip(deterministic_actions, -max_action, max_action)
-        return rnd_actions * (1. - deterministic) + \
-              deterministic * deterministic_actions
-    
-    @classmethod
+
+    @staticmethod
     def get_action(
-        self,
         train_state: AgentTrainState,
         config: AgentConfig,
         observations: np.ndarray,
@@ -379,25 +289,67 @@ class Agent(object):
         deterministic: bool = False,
         max_action: float = 1.0,  # Actions should be in [-1, 1] accross all dimensions
     ) -> jnp.ndarray:
-        if not config.distributional_actor:
-            actions = networks.actor.apply(
-                train_state.params_actor, observations) * max_action
-            policy_noise = (config.policy_noise_std * max_action
-                * (1. - deterministic) * jax.random.normal(seed, actions.shape))
-            actions = jnp.clip(actions + policy_noise.clip(
-                -config.policy_noise_clip, config.policy_noise_clip), 
-                -max_action, max_action)
-            return actions
-        else:
-            return self.get_distributional_action(
-                train_state, 
-                config, 
-                observations, 
-                seed, 
-                networks, 
-                deterministic, 
-                max_action
-            )
+        return networks.actor.get_action(
+            train_state,
+            config,
+            observations,
+            seed,
+            networks,
+            deterministic,
+            max_action
+        )
+        
+
+    # @classmethod
+    # def get_distributional_action(
+    #     self,
+    #     train_state: AgentTrainState,
+    #     config: AgentConfig,
+    #     observations: np.ndarray,
+    #     seed: jax.random.PRNGKey,
+    #     networks: AgentNetworks,
+    #     deterministic: bool = False,
+    #     max_action: float = 1.0,  # Actions should be in [-1, 1] accross all dimensions
+    # ) -> jnp.ndarray:
+    #     dist, deterministic_actions = networks.actor.apply(
+    #         train_state.params_actor, observations
+    #     )
+    #     rnd_actions = dist.sample(seed=seed)
+    #     rnd_actions = jnp.clip(rnd_actions, -max_action, max_action)
+    #     deterministic_actions = jnp.clip(deterministic_actions, -max_action, max_action)
+    #     return rnd_actions * (1. - deterministic) + \
+    #           deterministic * deterministic_actions
+    
+    # @classmethod
+    # def get_action(
+    #     self,
+    #     train_state: AgentTrainState,
+    #     config: AgentConfig,
+    #     observations: np.ndarray,
+    #     seed: jax.random.PRNGKey,
+    #     networks: AgentNetworks,
+    #     deterministic: bool = False,
+    #     max_action: float = 1.0,  # Actions should be in [-1, 1] accross all dimensions
+    # ) -> jnp.ndarray:
+    #     if not config.distributional_actor:
+    #         actions = networks.actor.apply(
+    #             train_state.params_actor, observations) * max_action
+    #         policy_noise = (config.policy_noise_std * max_action
+    #             * (1. - deterministic) * jax.random.normal(seed, actions.shape))
+    #         actions = jnp.clip(actions + policy_noise.clip(
+    #             -config.policy_noise_clip, config.policy_noise_clip), 
+    #             -max_action, max_action)
+    #         return actions
+    #     else:
+    #         return self.get_distributional_action(
+    #             train_state, 
+    #             config, 
+    #             observations, 
+    #             seed, 
+    #             networks, 
+    #             deterministic, 
+    #             max_action
+    #         )
 
 
 def fake_args(dim: int):
@@ -427,6 +379,7 @@ def create_agent_train_state(
         if config.tanh_actor:
             def fn_actor():
                 return StateDependentGaussianPolicyTanh(
+                    num_actors=config.num_actors,
                     action_dim=action_dim,
                     hidden_units=config.actor_hidden_dims,
                     log_std_min=config.policy_log_std_min,
@@ -435,6 +388,7 @@ def create_agent_train_state(
         else:
             def fn_actor():
                 return StateDependentGaussianPolicy(
+                    num_actors=config.num_actors,
                     action_dim=action_dim,
                     hidden_units=config.actor_hidden_dims,
                     log_std_min=config.policy_log_std_min,
@@ -443,6 +397,7 @@ def create_agent_train_state(
     else:
         def fn_actor():
             return DeterministicPolicy(
+                num_actors=config.num_actors,
                 action_dim=action_dim,
                 hidden_units=config.actor_hidden_dims,
             )
