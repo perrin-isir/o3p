@@ -324,6 +324,25 @@ class DeterministicPolicy(nn.Module):
         else:
             return [actor(x) for actor in self.actors]
     
+    @staticmethod
+    def get_action(
+        train_state: AgentTrainState,
+        config: AgentConfig,
+        observations: np.ndarray,
+        seed: jax.random.PRNGKey,
+        networks: AgentNetworks,
+        deterministic: bool = False,
+        max_action: float = 1.0,
+    ) -> jnp.ndarray:
+        actions = networks.actor.apply(
+            train_state.params_actor, observations, index=0) * max_action
+        policy_noise = (config.policy_noise_std * max_action
+            * (1. - deterministic) * jax.random.normal(seed, actions.shape))
+        actions = jnp.clip(actions + policy_noise.clip(
+            -config.policy_noise_clip, config.policy_noise_clip), 
+            -max_action, max_action)
+        return actions
+
 
 # class StateDependentGaussianPolicy(hk.Module):
 
