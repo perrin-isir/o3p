@@ -468,8 +468,6 @@ def create_agent_train_state(
     opt_init, s_opt_critic = optimizer(config.critic_lr)
     s_opt_state_critic = opt_init(s_params_critic)
 
-    __import__("IPython").embed()
-
     s_value = fn_value()
     variables = s_value.init(key2, *fake_args_value)
     s_params_value = variables
