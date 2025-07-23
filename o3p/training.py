@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import tqdm
 from typing import Callable, Union, Any, Tuple, Optional, Dict
 import optax
-import haiku as hk
+import flax
 import time
 import os
 
@@ -13,7 +13,7 @@ from o3p.agents import AgentTrainState, AgentNetworks, Agent, create_agent_train
 from o3p.envs import flatten_recursive, flatten_goalenv_obs, _EnvType, get_env_type, dict_flatten_goalenv_obs
 from o3p.buffers import DefaultBuffer, DefaultEpisodicBuffer
 from o3p.samplers import DefaultSampler, DefaultEpisodicSampler, HER
-from o3p.logging import o3p_log, o3p_log_reset
+from o3p.logs import o3p_log, o3p_log_reset
 
 
 def time_stamp():
@@ -26,17 +26,17 @@ def optimize_multi_models(
     fn_loss: Any,
     opt: Any,
     opt_state: Any,
-    params_to_update: hk.Params,
+    params_to_update: flax.core.FrozenDict,
     opt2: Any,
     opt_state2: Any,
-    params_to_update2: hk.Params,
+    params_to_update2: flax.core.FrozenDict,
     opt3: Any,
     opt_state3: Any,
-    params_to_update3: hk.Params,
+    params_to_update3: flax.core.FrozenDict,
     opt4: Any,
     opt_state4: Any,
-    params_to_update4: hk.Params,
-) -> Tuple[Any, hk.Params, Any, hk.Params, jnp.ndarray, Any]:
+    params_to_update4: flax.core.FrozenDict,
+) -> Tuple[Any, flax.core.FrozenDict, Any, flax.core.FrozenDict, jnp.ndarray, Any]:
     (loss, aux), grad = jax.value_and_grad(fn_loss, argnums=(0, 1, 2, 3), has_aux=True)(
         params_to_update,
         params_to_update2,

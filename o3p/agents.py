@@ -1,5 +1,6 @@
 from typing import NamedTuple, Tuple, Dict, Any, List, Optional
-import haiku as hk
+# import haiku as hk
+import flax
 import jax
 from pydantic import BaseModel
 import abc
@@ -97,14 +98,24 @@ class AgentNetworks(NamedTuple):
     opt_scalars: Any
 
 
-def target_update(
-    online_params: hk.Params,
-    target_params: hk.Params,
-    tau: float,
-) -> hk.Params:
-    return jax.tree_util.tree_map(
-        lambda t, s: (1 - tau) * t + tau * s, target_params, online_params)
+# def target_update(
+#     online_params: hk.Params,
+#     target_params: hk.Params,
+#     tau: float,
+# ) -> hk.Params:
+#     return jax.tree_util.tree_map(
+#         lambda t, s: (1 - tau) * t + tau * s, target_params, online_params)
 
+def target_update(
+    online_params: flax.core.FrozenDict,
+    target_params: flax.core.FrozenDict,
+    tau: float,
+) -> flax.core.FrozenDict:
+    return jax.tree_util.tree_map(
+        lambda t, s: (1 - tau) * t + tau * s,
+        target_params,
+        online_params,
+    )
 
 class Agent(object):
 
@@ -400,41 +411,41 @@ def create_agent_train_state(
     config: AgentConfig,
 ) -> AgentTrainState:
     
-    def fn_value(s):
+    def fn_value():
         return ContinuousVFunction(
             num_values=config.num_values,
             hidden_units=tuple(config.value_hidden_dims),
-        )(s)
+        )
 
-    def fn_critic(s, a):
+    def fn_critic():
         return ContinuousQFunction(
             num_critics=config.num_critics,
             hidden_units=config.critic_hidden_dims,
-        )(s, a)
+        )
 
     if config.distributional_actor:
         if config.tanh_actor:
-            def fn_actor(s):
+            def fn_actor():
                 return StateDependentGaussianPolicyTanh(
                     action_dim=action_dim,
                     hidden_units=config.actor_hidden_dims,
                     log_std_min=config.policy_log_std_min,
                     log_std_max=config.policy_log_std_max,
-                )(s)
+                )
         else:
-            def fn_actor(s):
+            def fn_actor():
                 return StateDependentGaussianPolicy(
                     action_dim=action_dim,
                     hidden_units=config.actor_hidden_dims,
                     log_std_min=config.policy_log_std_min,
                     log_std_max=config.policy_log_std_max,
-                )(s)
+                )
     else:
-        def fn_actor(s):
+        def fn_actor():
             return DeterministicPolicy(
                 action_dim=action_dim,
                 hidden_units=config.actor_hidden_dims,
-            )(s)
+            )
 
     rng, key1, key2, key3 = jax.random.split(rng, 4)
     
@@ -449,21 +460,29 @@ def create_agent_train_state(
     fake_args_critic = (fake_args(observation_dim), fake_args(action_dim))
     fake_args_value = fake_args_actor = (fake_args(observation_dim),)
 
-    s_critic = hk.without_apply_rng(hk.transform(fn_critic))
-    s_params_critic = s_params_critic_target = s_critic.init(
-        key1, *fake_args_critic)
+    s_critic = fn_critic()
+    variables = s_critic.init(key1, *fake_args_critic)
+    s_params_critic = variables
+    # s_params_critic = variables['params']
+    s_params_critic_target = s_params_critic
     opt_init, s_opt_critic = optimizer(config.critic_lr)
     s_opt_state_critic = opt_init(s_params_critic)
 
-    s_value = hk.without_apply_rng(hk.transform(fn_value))
-    s_params_value = s_params_value_target = s_value.init(
-        key2, *fake_args_value)
+    __import__("IPython").embed()
+
+    s_value = fn_value()
+    variables = s_value.init(key2, *fake_args_value)
+    s_params_value = variables
+    # s_params_value = variables['params']
+    s_params_value_target = s_params_value
     opt_init, s_opt_value = optimizer(config.value_lr)
     s_opt_state_value = opt_init(s_params_value)
 
-    s_actor = hk.without_apply_rng(hk.transform(fn_actor))
-    s_params_actor = s_params_actor_target = s_actor.init(
-        key3, *fake_args_actor)
+    s_actor = fn_actor()
+    variables = s_actor.init(key3, *fake_args_actor)
+    s_params_actor = variables
+    # s_params_actor = variables['params']
+    s_params_actor_target = s_params_actor
     opt_init, s_opt_actor = optimizer(config.actor_lr)
     s_opt_state_actor = opt_init(s_params_actor)
 
