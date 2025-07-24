@@ -5,10 +5,17 @@ import numpy as np
 import distrax
 from flax import linen as nn
 import jax.numpy as jnp
-from typing import Sequence, Callable, Optional, Tuple, NamedTuple, Any
+from typing import Sequence, Callable, Optional, Tuple, NamedTuple, Any, Union
 from pydantic import BaseModel
 import tempfile
 import os
+from enum import Enum
+
+
+class ActorType(Enum):
+    DeterministicPolicy = "DeterministicPolicy"
+    StateDependentGaussianPolicy = "StateDependentGaussianPolicy"
+    StateDependentGaussianPolicyTanh = "StateDependentGaussianPolicyTanh"
 
 
 class AgentConfig(BaseModel):
@@ -43,8 +50,7 @@ class AgentConfig(BaseModel):
     opt_decay_schedule: bool = False
     use_infos: bool = False
     save_dir: str = os.path.join(tempfile.gettempdir(), "o3p", "logs")
-    distributional_actor: bool = True
-    tanh_actor: bool = True
+    actor_type: ActorType = ActorType.DeterministicPolicy
     policy_log_std_min: float = -10.0
     policy_log_std_max: float = 2.0
     policy_noise_std: float = 0.2
@@ -343,7 +349,12 @@ class DeterministicPolicy(nn.Module):
             -max_action, max_action)
         return actions
 
-
+ActorType.DeterministicPolicy.class_fn = \
+    lambda action_dim, config : DeterministicPolicy(
+        num_actors=config.num_actors,
+        action_dim=action_dim,
+        hidden_units=config.actor_hidden_dims,
+    )
 # class StateDependentGaussianPolicy(hk.Module):
 
 #     def __init__(
@@ -506,7 +517,16 @@ class StateDependentGaussianPolicy(nn.Module):
 #         deterministic_action = jnp.tanh(mean)
 #         # TODO: scale with max_action
 #         return dist, deterministic_action
-    
+
+ActorType.StateDependentGaussianPolicy.class_fn = \
+    lambda action_dim, config : StateDependentGaussianPolicy(
+        num_actors=config.num_actors,
+        action_dim=action_dim,
+        hidden_units=config.actor_hidden_dims,
+        log_std_min=config.policy_log_std_min,
+        log_std_max=config.policy_log_std_max,
+    )
+
 
 class StateDependentGaussianPolicyTanh(StateDependentGaussianPolicy):
     def __call__(
@@ -537,6 +557,14 @@ class StateDependentGaussianPolicyTanh(StateDependentGaussianPolicy):
         return transformed_dists, deterministic_actions
 
 
+ActorType.StateDependentGaussianPolicyTanh.class_fn = \
+    lambda action_dim, config : StateDependentGaussianPolicyTanh(
+        num_actors=config.num_actors,
+        action_dim=action_dim,
+        hidden_units=config.actor_hidden_dims,
+        log_std_min=config.policy_log_std_min,
+        log_std_max=config.policy_log_std_max,
+    )
 # class StateDependentGaussianPolicyTanh(StateDependentGaussianPolicy):
 #     def __call__(self, x: jnp.ndarray) -> Tuple[distrax.Distribution, jnp.ndarray]:
 #         # Get original Gaussian distribution and mean

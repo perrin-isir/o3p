@@ -8,7 +8,7 @@ import flax
 import gymnasium
 
 from o3p.buffers import extract_from_batch
-from o3p.models import AgentConfig, AgentTrainState, AgentNetworks
+from o3p.models import AgentConfig, AgentTrainState, AgentNetworks, ActorType
 from o3p.agents import Agent
 from o3p.training import grad_update
 
@@ -25,8 +25,9 @@ class IQL(Agent):
     ) -> None:
         config_dict = self.CustomConfig(**config_dict)
         # non-modifiable params:
-        config_dict.distributional_actor = True
-        config_dict.tanh_actor = False
+        # config_dict.distributional_actor = True
+        # config_dict.tanh_actor = False
+        config_dict.actor_type = ActorType.StateDependentGaussianPolicy
         config_dict.num_critics = 2
         config_dict.num_actors = 1
         config_dict.target_critic = False

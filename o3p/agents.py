@@ -374,33 +374,36 @@ def create_agent_train_state(
             num_critics=config.num_critics,
             hidden_units=config.critic_hidden_dims,
         )
+    
+    def fn_actor():
+        return config.actor_type.class_fn(action_dim, config)
 
-    if config.distributional_actor:
-        if config.tanh_actor:
-            def fn_actor():
-                return StateDependentGaussianPolicyTanh(
-                    num_actors=config.num_actors,
-                    action_dim=action_dim,
-                    hidden_units=config.actor_hidden_dims,
-                    log_std_min=config.policy_log_std_min,
-                    log_std_max=config.policy_log_std_max,
-                )
-        else:
-            def fn_actor():
-                return StateDependentGaussianPolicy(
-                    num_actors=config.num_actors,
-                    action_dim=action_dim,
-                    hidden_units=config.actor_hidden_dims,
-                    log_std_min=config.policy_log_std_min,
-                    log_std_max=config.policy_log_std_max,
-                )
-    else:
-        def fn_actor():
-            return DeterministicPolicy(
-                num_actors=config.num_actors,
-                action_dim=action_dim,
-                hidden_units=config.actor_hidden_dims,
-            )
+    # if config.distributional_actor:
+    #     if config.tanh_actor:
+    #         def fn_actor():
+    #             return StateDependentGaussianPolicyTanh(
+    #                 num_actors=config.num_actors,
+    #                 action_dim=action_dim,
+    #                 hidden_units=config.actor_hidden_dims,
+    #                 log_std_min=config.policy_log_std_min,
+    #                 log_std_max=config.policy_log_std_max,
+    #             )
+    #     else:
+    #         def fn_actor():
+    #             return StateDependentGaussianPolicy(
+    #                 num_actors=config.num_actors,
+    #                 action_dim=action_dim,
+    #                 hidden_units=config.actor_hidden_dims,
+    #                 log_std_min=config.policy_log_std_min,
+    #                 log_std_max=config.policy_log_std_max,
+    #             )
+    # else:
+    #     def fn_actor():
+    #         return DeterministicPolicy(
+    #             num_actors=config.num_actors,
+    #             action_dim=action_dim,
+    #             hidden_units=config.actor_hidden_dims,
+    #         )
 
     rng, key1, key2, key3 = jax.random.split(rng, 4)
     
