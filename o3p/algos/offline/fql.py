@@ -38,8 +38,12 @@ class FQL(Agent):
         actor_lr: float = 3e-4
         tau: float = 0.005
         flow_steps: int = 10
-        normalize_q_loss: bool = False
-        alpha: float = 10.0
+        normalize_q_loss: bool = True
+        alpha: float = 0.1
+        # critic_hidden_dims: Tuple[int, int] = (512, 512, 512, 512)
+        critic_hidden_dims: Tuple[int, int] = (256, 256)
+        # actor_hidden_dims: Tuple[int, int] = (512, 512, 512, 512)
+        actor_hidden_dims: Tuple[int, int] = (256, 256)
 
     @classmethod
     def update_models(
@@ -52,6 +56,9 @@ class FQL(Agent):
         config: AgentConfig
     ) -> Tuple["AgentTrainState", Dict]:
 
+        action_dim = networks.actor.action_dim
+        batch_size = config.batch_size
+    
         (observations, actions, rewards, next_observations, dones, infos) = \
             extract_from_batch(batch)
 
@@ -61,21 +68,23 @@ class FQL(Agent):
         next_actions = networks.actor.get_action(
             train_state,
             config,
-            observations,
+            next_observations,
             key_critic,
             networks,
             deterministic = False,
             max_action = max_action,
         )
+        # noises = jax.random.normal(key_critic, (batch_size, action_dim))
+        # next_actions = networks.actor.apply(train_state.params_actor, next_observations, noises, None, index=0)
+        # next_actions = jnp.clip(next_actions, -max_action, max_action)
+
         next_q = jnp.asarray(networks.critic.apply(
             train_state.params_critic_target, next_observations, next_actions
-        )).min(axis=0)
+        )).mean(axis=0)
 
         target_q = jax.lax.stop_gradient(
             rewards + (1.0 - dones) * config.discount * next_q)
 
-        action_dim = networks.actor.action_dim
-        batch_size = config.batch_size
         rng, x_rng, t_rng = jax.random.split(rng, 3)
 
         # BC flow loss.
@@ -92,7 +101,7 @@ class FQL(Agent):
             t = jnp.full((*observations.shape[:-1], 1), i / config.flow_steps)
             vels = networks.actor.apply(train_state.params_actor, observations, target_flow_actions, t, is_encoded=True, index=1)
             target_flow_actions = target_flow_actions + vels / config.flow_steps
-        target_flow_actions = jnp.clip(noises, -max_action, max_action)
+        target_flow_actions = jnp.clip(target_flow_actions, -max_action, max_action)
 
         def _loss(
             params_value: flax.core.FrozenDict,
@@ -104,19 +113,19 @@ class FQL(Agent):
             q1, q2 = networks.critic.apply(params_critic, observations, actions)
             loss_critic = ((q1 - target_q) ** 2 + (q2 - target_q) ** 2).mean()
 
-            pred = networks.actor.apply(observations, x_t, t, index=1)
-            # BC flow loss
+            pred = networks.actor.apply(params_actor, observations, x_t, t, index=1)
+            # # BC flow loss
             bc_flow_loss = jnp.mean((pred - vel) ** 2)
 
-            actor_actions = networks.actor.apply(params_actor, observations, noises)
+            actor_actions = networks.actor.apply(params_actor, observations, noises, None, index=0)
             # Distillation loss
             distill_loss = jnp.mean((actor_actions - target_flow_actions) ** 2)
 
             actor_actions = jnp.clip(actor_actions, -1, 1)
-            qs = jax.lax.stop_gradient(
+            qs1, qs2 = jax.lax.stop_gradient(
                 networks.critic.apply(params_critic, observations, actor_actions)
             )
-            q = jnp.mean(qs, axis=0)
+            q = jnp.mean(qs1 + qs2, axis=0)
             # Q loss
             q_loss = -q.mean()
             if config.normalize_q_loss:

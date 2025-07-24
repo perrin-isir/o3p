@@ -1,6 +1,7 @@
 from typing import NamedTuple, Tuple, Dict, Any, List, Optional
 # import haiku as hk
 import flax
+from flax.core import freeze, unfreeze
 import jax
 import abc
 import numpy as np
@@ -435,7 +436,25 @@ def create_agent_train_state(
     s_opt_state_value = opt_init(s_params_value)
 
     s_actor = fn_actor()
-    variables = s_actor.init(key3, *fake_args_actor)
+    # variables = s_actor.init(key3, *fake_args_actor)
+    variables = s_actor.init(key3, *fake_args_critic, jnp.ones((1, 1)))
+    
+    # variables_0 = s_actor.init(key3, *fake_args_critic, None, index=0)
+    # variables_1 = s_actor.init(key3, *fake_args_critic, jnp.ones((1, 1)), index=1)
+    # params0 = unfreeze(variables_0['params'])
+    # params1 = unfreeze(variables_1['params'])
+
+    # print("params0 keys:", params0.keys())  # likely includes 'actors_0'
+    # print("params1 keys:", params1.keys())  # likely includes 'actors_1'
+
+    # # Merge the actors from params1 into params0
+    # params0.update(params1)
+
+    # # Freeze and rewrap
+    # variables = freeze({'params': params0})
+    # __import__("IPython").embed()
+
+
     s_params_actor = variables
     # s_params_actor = variables['params']
     s_params_actor_target = s_params_actor
