@@ -5,6 +5,7 @@ from gymnasium.spaces import Dict as GymnaDict
 import minari
 import numpy as np
 import enum
+import ogbench
 
 from o3p.buffers import DefaultBuffer, proper_reshape
 
@@ -218,6 +219,85 @@ def get_minari(
             return wrap_env(_dataset.recover_environment(), env_type, obs_mean, obs_std)
         else:
             return _dataset.recover_environment()
+
+    return (
+        buffer, 
+        env, 
+        env_creator, 
+        normalizing_factor, 
+        obs_mean, 
+        obs_std, 
+        ref_max_score
+    )
+
+
+def get_ogbench(
+    env_name: str,
+    normalize_reward: bool = True,
+    normalize_obs : bool = False,
+):
+
+    env, _dataset, _val_dataset = ogbench.make_env_and_datasets(env_name)
+
+    buffer_size = _dataset["rewards"].shape[0]
+    buffer = DefaultBuffer(buffer_size)
+
+    transition_dict = {
+        "observations": proper_reshape(_dataset["observations"][:]),
+        "actions": proper_reshape(_dataset["actions"][:]),
+        "rewards": proper_reshape(_dataset["rewards"][:]),
+        "terminations": proper_reshape(_dataset["terminals"][:]),
+        "truncations": proper_reshape(_dataset["terminals"][:]) * proper_reshape(_dataset["masks"][:]),
+        "next_observations": proper_reshape(_dataset["next_observations"][:]),
+        "infos": {}
+    }
+    ref_max_score = 0.
+
+    buffer.insert(transition_dict["rewards"].shape[0], transition_dict)
+
+    obs_mean = None
+    obs_std = None
+
+    if normalize_reward:
+        reward_max = buffer.buffers["rewards"].max()
+        reward_min = buffer.buffers["rewards"].min()
+        normalizing_factor = 1000. / (reward_max - reward_min)
+        buffer.buffers["rewards"] = \
+            buffer.buffers["rewards"] * normalizing_factor
+    else:
+        normalizing_factor = 1.
+
+    if normalize_obs:
+        obs_mean = {}
+        obs_std = {}
+        for key in buffer.buffers:
+            if key.startswith("observations"):
+                obs_mean[key], obs_std[key] = compute_mean_std(
+                    buffer.buffers[key], 1e-3)
+                buffer.buffers[key] = (
+                    buffer.buffers[key] - obs_mean[key]) / obs_std[key]
+                
+            # buffer.buffers["next_observations"] = (
+            #     buffer.buffers["next_observations"] - obs_mean) / (obs_std + 1e-5)
+
+        for key in buffer.buffers:
+            if key.startswith("next_observations"):
+                buffer.buffers[key] = (
+                    buffer.buffers[key] - obs_mean[key[5:]]) / obs_std[key[5:]]
+
+    buffer.to_jax()
+
+    env_type = get_env_type(env.observation_space)
+
+    def env_creator():
+        if obs_mean is not None and obs_std is not None:
+            return wrap_env(
+                ogbench.make_env_and_datasets(env_name, env_only=True), 
+                env_type, 
+                obs_mean, 
+                obs_std)
+        else:
+            return ogbench.make_env_and_datasets(env_name, env_only=True)
 
     return (
         buffer, 
