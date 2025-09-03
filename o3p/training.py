@@ -120,6 +120,7 @@ def evaluate_parallel(
     finished = False
     counts = np.zeros(observation.shape[0])
     sum_rewards = np.zeros(observation.shape[0])
+    #TODO: correct big issue with coef
     coef = np.ones(observation.shape[0]) 
     while not finished:
         rng, subkey = jax.random.split(rng)

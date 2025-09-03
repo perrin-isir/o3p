@@ -124,6 +124,7 @@ class Agent(object):
                 subkey1, (config.batch_size,), 0, buffer_size
             )
             batch = jax.tree_util.tree_map(lambda x: x[batch_indices], buffers)
+
             new_train_state, update_info = self.update_on_batch(
                 iteration + k,
                 subkey2,

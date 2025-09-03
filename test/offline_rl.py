@@ -10,7 +10,7 @@ conf_dict.max_steps = 500_000
 conf_dict.eval_interval = 50_000
 conf_dict.log_interval = 50_000
 conf_dict.save_train_state_interval = 50_000
-conf_dict.eval_episodes = 100
+conf_dict.eval_episodes = 10
 
 algo = FQL(conf_dict)
 # env_name = "mujoco/halfcheetah/medium-v0"

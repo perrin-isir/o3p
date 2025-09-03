@@ -39,7 +39,7 @@ class FQL(Agent):
         tau: float = 0.005
         flow_steps: int = 10
         normalize_q_loss: bool = True
-        alpha: float = 0.1
+        alpha: float = 300.0
         # critic_hidden_dims: Tuple[int, int] = (512, 512, 512, 512)
         critic_hidden_dims: Tuple[int, int] = (256, 256)
         # actor_hidden_dims: Tuple[int, int] = (512, 512, 512, 512)
