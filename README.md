@@ -12,9 +12,6 @@ It is currently in BETA VERSION.
 
     git clone https://github.com/perrin-isir/o3p.git
 
-
-[Jax](https://docs.jax.dev/en/latest/index.html) is in the dependencies, but we recommend to install it beforehand, separately, and verify that it is working well. Please follow instructions at: [https://docs.jax.dev/en/latest/installation.html#installation](https://docs.jax.dev/en/latest/installation.html#installation).
-
 We recommand to create a python environment with [micromamba](https://mamba.readthedocs.io/en/latest/user_guide/micromamba.html),
 but any python package manager can be used instead.
 
@@ -25,6 +22,12 @@ but any python package manager can be used instead.
     micromamba activate o3penv
 
     pip install -e .
+    
+* About [JAX](https://docs.jax.dev/en/latest/index.html): JAX is in the dependencies, so the procedure will install it on your system. However, if you encounter specific issues with JAX (e.g. it runs on your CPU instead of your GPU), we recommend to install it separately, following instructions at: [https://docs.jax.dev/en/latest/installation.html#installation](https://docs.jax.dev/en/latest/installation.html#installation).
+
+* About [TFP](https://github.com/tensorflow/probability): Currently, the latest stable version of TFP is not compatible with the latest version of JAX. Therefore, you should upgrade to a nightly build with this command (within your new o3penv environment):
+
+    pip install --upgrade --user tf-nightly tfp-nightly
 
 </details>
 <details><summary> <b>How to use it</b> </summary><p>
